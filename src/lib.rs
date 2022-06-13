@@ -1,3 +1,4 @@
+mod util;
 pub mod domain;
 pub mod meta;
 pub mod testcase;

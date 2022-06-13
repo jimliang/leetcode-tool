@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::bail;
 use async_std::{fs::File, io::BufWriter, io::WriteExt};
 
-use crate::domain::Question;
+use crate::{domain::{Question, CodeSnippet}, meta::MetaData, util::parse_struct_name};
 
 use super::{END_LINE, START_LINE};
 
@@ -16,6 +16,37 @@ use super::{END_LINE, START_LINE};
 
 //     }
 // }
+
+fn get_test_code(question: &Question, snippet: &CodeSnippet) -> String {
+
+    let meta: MetaData = serde_json::from_str(&question.meta_data).unwrap();
+
+    match meta {
+        MetaData::Base { .. } => todo!(),
+        MetaData::Class { classname, constructor, methods, r#return } => {
+            let struct_name = parse_struct_name(&snippet.code).unwrap_or("UnknowStruct");
+            let import_code = r"use crate::util::fs::{TestObject, assert_object};
+            use serde_json::Value;";
+
+            // let a = r"aa
+            // aaa
+            // ";
+
+            let test_code = format!(r"
+            impl TestObject for {} \{
+                fn call(&mut self, method: &str, params: &Vec<Value>) -> Option<Value> \{
+                    match method \{
+                        {}
+                        _ => \{\},
+                    }
+                    None
+                }
+            }
+            ", struct_name, "");
+        },
+    }
+    todo!()
+}
 
 pub async fn write_template(
     question: &Question,

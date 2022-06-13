@@ -18,7 +18,7 @@ pub struct Question {
     #[serde(rename = "metaData")]
     pub meta_data: String,
     #[serde(rename = "exampleTestcases")]
-    pub example_testcases: String,
+    pub example_testcases: Option<String>,
     #[serde(rename = "sampleTestCase")]
     pub sample_test_case: String,
 }
