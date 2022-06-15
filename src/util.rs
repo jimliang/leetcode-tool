@@ -5,7 +5,8 @@ pub fn parse_struct_name(s: &str) -> Option<&str> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"struct ([\S]+)").unwrap();
     }
-    for caps in RE.captures_iter(s) {
+    let mut iter =  RE.captures_iter(s);
+    if let Some(caps) = iter.next() {
         return caps.get(1).map(|v|v.as_str())
     }
 

@@ -17,7 +17,7 @@ use super::{END_LINE, START_LINE};
 //     }
 // }
 
-fn get_test_code(question: &Question, snippet: &CodeSnippet) -> String {
+fn get_test_code(question: &Question, snippet: &CodeSnippet) -> (String, String) {
 
     let meta: MetaData = serde_json::from_str(&question.meta_data).unwrap();
 
@@ -28,24 +28,21 @@ fn get_test_code(question: &Question, snippet: &CodeSnippet) -> String {
             let import_code = r"use crate::util::fs::{TestObject, assert_object};
             use serde_json::Value;";
 
-            // let a = r"aa
-            // aaa
-            // ";
-
             let test_code = format!(r"
-            impl TestObject for {} \{
-                fn call(&mut self, method: &str, params: &Vec<Value>) -> Option<Value> \{
-                    match method \{
+            impl TestObject for {} {{
+                fn call(&mut self, method: &str, params: &Vec<Value>) -> Option<Value> {{
+                    match method {{
                         {}
-                        _ => \{\},
-                    }
+                        _ => {{}},
+                    }}
                     None
-                }
-            }
+                }}
+            }}
             ", struct_name, "");
+
+            (import_code.to_owned(), test_code)
         },
     }
-    todo!()
 }
 
 pub async fn write_template(
@@ -56,19 +53,36 @@ pub async fn write_template(
         Some(snippet) => snippet,
         None => bail!("Fail to get Rust code Snippet"),
     };
-    let test_code = "";
+    let (import_code, test_code) = get_test_code(question, snippet);
 
     let title = question.title_slug.replace('-', "_");
     let file_path = project_dir.join(format!("{}.rs", title));
     let mut file = File::create(file_path).await?;
     let mut buf_writer = BufWriter::new(file);
 
-    buf_writer.write(b"pub struct Solution;\n").await.unwrap();
-    buf_writer.write(START_LINE.as_bytes()).await.unwrap();
-    buf_writer.write(b"\n").await.unwrap();
-    buf_writer.write(snippet.code.as_bytes()).await.unwrap();
-    buf_writer.write(END_LINE.as_bytes()).await.unwrap();
-    buf_writer.write(test_code.as_bytes()).await.unwrap();
+    // buf_writer.write(b"pub struct Solution;\n").await.unwrap();
+    // buf_writer.write(START_LINE.as_bytes()).await.unwrap();
+    // buf_writer.write(b"\n").await.unwrap();
+    // buf_writer.write(snippet.code.as_bytes()).await.unwrap();
+    // buf_writer.write(END_LINE.as_bytes()).await.unwrap();
+    // buf_writer.write(test_code.as_bytes()).await.unwrap();
+
+    buf_writer.write(format!(r"
+        {import_code}
+
+        pub struct Solution;
+
+        {START_LINE}
+
+        {code}
+
+        {END_LINE}
+
+        {test_code}
+
+    ", code = snippet.code).as_bytes()).await?;
+
+    buf_writer.flush().await?;
 
     Ok(())
 }
