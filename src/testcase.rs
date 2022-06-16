@@ -49,7 +49,7 @@ pub fn parse_test_cases<'a>(s: &'a str) -> Result<impl Iterator<Item = serde_jso
 
 pub fn parse_class_test_cases(s: &str) -> Result<impl Iterator<Item = ClassTestCase>> {
     let mut sp = s.split('\n');
-    
+
     let n1 = sp.next();
     let n2 = sp.next();
     if let (Some(line1), Some(line2)) = (n1, n2) {
@@ -58,16 +58,13 @@ pub fn parse_class_test_cases(s: &str) -> Result<impl Iterator<Item = ClassTestC
             let params: Vec<Vec<String>> = serde_json::from_str(line2)?;
             (name.into_iter(), params.into_iter())
         };
-        
-        let iter = (0..).map_while(move |_| {
-            match (name.next(), params.next()) {
-                (Some(name), Some(params)) => Some(ClassTestCase { name, params }),
-                _ => None,
-            }
+
+        let iter = (0..).map_while(move |_| match (name.next(), params.next()) {
+            (Some(name), Some(params)) => Some(ClassTestCase { name, params }),
+            _ => None,
         });
 
         Ok(iter)
-
     } else {
         bail!("parse test cases error")
     }

@@ -5,14 +5,13 @@ pub fn parse_struct_name(s: &str) -> Option<&str> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"struct ([\S]+)").unwrap();
     }
-    let mut iter =  RE.captures_iter(s);
+    let mut iter = RE.captures_iter(s);
     if let Some(caps) = iter.next() {
-        return caps.get(1).map(|v|v.as_str())
+        return caps.get(1).map(|v| v.as_str());
     }
 
     None
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -23,6 +22,4 @@ mod tests {
         let name = parse_struct_name("pub struct ListNode {\n//   pub val: i32,\n//   pub next:");
         println!("{:?}", name);
     }
-
-
 }
