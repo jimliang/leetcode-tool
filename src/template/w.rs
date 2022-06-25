@@ -10,7 +10,7 @@ use async_std::{
 use crate::{
     domain::{CodeSnippet, Question},
     guest::guest_output,
-    meta::{MetaData, MetaDataType},
+    meta::{MetaData, MetaDataMethod, MetaDataType},
     testcase::parse_test_cases,
     util::parse_struct_name,
 };
@@ -43,15 +43,33 @@ impl<'a> WriteTemplate<'a> {
         })
     }
 
-    fn generate_test_code(&mut self) -> Result<(), anyhow::Error> {
+    fn generate_test_code(&mut self) -> Result<bool, anyhow::Error> {
         let meta: MetaData = serde_json::from_str(&self.question.meta_data)?;
 
-        match meta {
+        let v = match meta {
             MetaData::Base {
                 name,
                 params,
                 r#return,
             } => {
+                let mut type_iter = params
+                    .iter()
+                    .map(|p| &p.r#type)
+                    .chain(std::iter::once(&r#return.r#type));
+
+                if type_iter.clone().any(|ty| match ty {
+                    MetaDataType::TreeNode => true,
+                    _ => false,
+                }) {
+                    self.import_code
+                        .push("use crate::util::tree::TreeNode;".into());
+                }
+                if type_iter.any(|ty| match ty {
+                    MetaDataType::ListNode => true,
+                    _ => false,
+                }) {
+                    self.import_code.push("use crate::util::ListNode;".into());
+                }
                 let test_cases = {
                     let test_cases_str = if let Some(s) = self.question.example_testcases.as_ref() {
                         s
@@ -93,13 +111,15 @@ impl<'a> WriteTemplate<'a> {
                 let test_code = format!(
                     r"
                 #[test]
-                    pub fn test_{name}() {{
+                    pub fn test_{method_name}() {{
                         {test_cases}
                 }}
                 "
                 );
 
                 self.test_code = Some(test_code);
+
+                false
             }
             MetaData::Class {
                 classname,
@@ -110,59 +130,78 @@ impl<'a> WriteTemplate<'a> {
                 let struct_name = parse_struct_name(&self.snippet.code).unwrap_or("UnknowStruct");
 
                 self.import_code
-                    .push("use crate::util::fs::{TestObject, assert_object}".into());
+                    .push("use crate::util::fs::{TestObject, assert_object};".into());
                 self.import_code.push("use serde_json::Value;".into());
 
+                let method_code = methods.iter().map(
+                    |MetaDataMethod {
+                         name,
+                         params,
+                         r#return,
+                     }| {
+
+                        let param_lines = params.iter().enumerate().map(|(i, param)| {
+                            let s = match param.r#type {
+                                MetaDataType::Integer => format!("params[${i}].as_i64().unwrap() as i32"),
+                                _ => "".into(),
+                            };
+
+                            format!("let p${i} = ${s};")
+                        }).collect::<Vec<String>>();
+                        let res = match r#return.r#type {
+                            MetaDataType::Bool => Some("Value::Bool(res)".to_owned()),
+                            MetaDataType::Integer => Some("Value::Number(res.into())".to_owned()),
+                            _ => None,
+                        };
+
+                        let ps_code = param_lines.join("\n");
+                        let ps_code2 = param_lines.iter().enumerate().map(|(i, _)| format!("p{i}")).collect::<Vec<String>>().join(",");
+
+                        let body = if let Some(res) = res {
+                            format!("{ps_code}\nlet res = self.{name}({ps_code2});\nreturn Some({res})")
+                        } else {
+                            format!("{ps_code}\nlet _ = self.{name}({ps_code2});")
+                        };
+
+                        format!("\"{name}\" => {{ {body} }}")
+                     },
+                ).collect::<Vec<String>>().join("\n");
                 let test_code = format!(
                     r"
-            impl TestObject for {} {{
+            impl TestObject for {struct_name} {{
                 fn call(&mut self, method: &str, params: &Vec<Value>) -> Option<Value> {{
                     match method {{
-                        {}
+                        {method_code}
                         _ => {{}},
                     }}
                     None
                 }}
             }}
             ",
-                    struct_name, ""
                 );
 
                 self.test_code = Some(test_code);
+                true
             }
-        }
+        };
 
-        Ok(())
+        Ok(v)
     }
 
     async fn write_to(&mut self, project_dir: PathBuf) -> Result<(), anyhow::Error> {
-        self.generate_test_code()?;
+        let is_class = self.generate_test_code()?;
         let file_path = project_dir.join(format!("src/{}.rs", self.title));
         let file = File::create(file_path).await?;
         let mut buf_writer = BufWriter::new(file);
 
         let import_code = self.import_code.join("\n");
+        let struct_code = if is_class { "" } else { "pub struct Solution;" };
         let test_code = self.test_code.take().unwrap_or_default();
+        let snippet_code = &self.snippet.code;
 
         buf_writer
             .write(
-                format!(
-                    r"
-        {import_code}
-
-        pub struct Solution;
-
-        {START_LINE}
-
-        {code}
-
-        {END_LINE}
-
-        {test_code}
-
-    ",
-                    code = self.snippet.code
-                )
+                format!("{import_code}\n{struct_code}\n{START_LINE}\n{snippet_code}\n{END_LINE}\n{test_code}")
                 .as_bytes(),
             )
             .await?;

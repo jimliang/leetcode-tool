@@ -52,9 +52,9 @@ pub async fn graphql<T: serde::de::DeserializeOwned>(body: GraphqlBody) -> Resul
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GraphqlBody {
     #[serde(rename = "operationName")]
-    operation_name: String,
-    variables: HashMap<String, String>,
-    query: String,
+    pub operation_name: String,
+    pub variables: HashMap<String, String>,
+    pub query: String,
 }
 
 pub async fn fetch_question(title_slug: String) -> Result<Question> {
