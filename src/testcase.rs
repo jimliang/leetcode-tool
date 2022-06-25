@@ -6,46 +6,11 @@ pub struct ClassTestCase {
     params: Vec<String>,
 }
 
-// pub struct ClassTestCaseIter {
-//     name: std::vec::IntoIter<String>,
-//     params: std::vec::IntoIter<Vec<String>>,
-// }
-
-// impl Iterator for ClassTestCaseIter {
-//     type Item = ClassTestCase;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         match (self.name.next(), self.params.next()) {
-//             (Some(name), Some(params)) => Some(ClassTestCase { name, params }),
-//             _ => None,
-//         }
-//     }
-// }
-
 pub fn parse_test_cases<'a>(s: &'a str) -> Result<impl Iterator<Item = serde_json::Value> + 'a> {
     let sp = s.split('\n');
     // Ok(sp.map(|b |b.to_owned()))
     Ok(sp.map(|v| serde_json::from_str(v).unwrap()))
 }
-
-// pub fn parse_class_test_cases(s: &str) -> Result<ClassTestCaseIter> {
-//     let mut sp = s.split('\n');
-//     // loop {
-//     let n1 = sp.next();
-//     let n2 = sp.next();
-//     if let (Some(line1), Some(line2)) = (n1, n2) {
-//         let name: Vec<String> = serde_json::from_str(line1).unwrap();
-//         let params: Vec<Vec<String>> = serde_json::from_str(line2)?;
-
-//         Ok(ClassTestCaseIter {
-//             name: name.into_iter(),
-//             params: params.into_iter(),
-//         })
-//     } else {
-//         bail!("parse test cases error")
-//     }
-//     // }
-// }
 
 pub fn parse_class_test_cases(s: &str) -> Result<impl Iterator<Item = ClassTestCase>> {
     let mut sp = s.split('\n');
@@ -89,5 +54,12 @@ mod tests {
     fn test_parse3() {
         let a = parse_test_cases("[1,2,3]\n[4,2,9,3,5,null,7]\n[21,7,14,1,1,2,2,3,3]").unwrap();
         println!("--> testcases: {:?}", a.collect::<Vec<_>>())
+    }
+    #[test]
+    fn test_parse4() {
+        let a = parse_test_cases("[[17,2,17],[16,16,5],[14,3,19]]\n[[7,6,2]]").unwrap();
+        for i in a {
+            println!("--> testcases: {:?}", i)
+        }
     }
 }

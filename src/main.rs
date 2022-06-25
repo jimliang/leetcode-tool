@@ -6,6 +6,8 @@ use leetcode_tool::{fetch, template};
 #[derive(Debug, clap::Subcommand)]
 enum Action {
     Fetch { title: String },
+    Submit { title: String },
+    Login,
 }
 
 #[derive(Debug, Parser)]
@@ -15,7 +17,7 @@ struct Args {
     action: Action,
 }
 
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     match args.action {
         Action::Fetch { title } => async_std::task::block_on(async {
@@ -25,5 +27,8 @@ fn main() {
                 .await
                 .unwrap();
         }),
+        Action::Submit { title } => todo!(),
+        Action::Login => todo!(),
     }
+    Ok(())
 }
