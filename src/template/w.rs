@@ -212,6 +212,33 @@ impl<'a> WriteTemplate<'a> {
         Ok(v)
     }
 
+    fn get_doc_code(&self) -> String {
+        let Question {
+            title_slug,
+            translated_title,
+            difficulty,
+            translated_content,
+            ..
+        } = self.question;
+
+        let md_lines = html2md::parse_html(translated_content)
+            .split("\n")
+            .map(|line| format!("/// {line}"))
+            .collect::<Vec<String>>()
+            .join("\n");
+        format!(
+            r"
+        /// # {translated_title}
+        ///
+        {md_lines}
+        ///
+        /// src: https://leetcode-cn.com/problems/{title_slug}/
+        ///
+        /// difficulty: \`{difficulty}\`
+    "
+        )
+    }
+
     async fn write_to(&mut self, project_dir: PathBuf) -> Result<(), anyhow::Error> {
         let is_class = self.generate_test_code()?;
         let file_path = project_dir.join(format!("src/{}.rs", self.title));
@@ -219,13 +246,14 @@ impl<'a> WriteTemplate<'a> {
         let mut buf_writer = BufWriter::new(file);
 
         let import_code = self.import_code.join("\n");
+        let doc_code = self.get_doc_code();
         let struct_code = if is_class { "" } else { "pub struct Solution;" };
         let test_code = self.test_code.take().unwrap_or_default();
         let snippet_code = &self.snippet.code;
 
         buf_writer
             .write(
-                format!("{import_code}\n{struct_code}\n{START_LINE}\n{snippet_code}\n{END_LINE}\n{test_code}")
+                format!("{import_code}\n{doc_code}\n{struct_code}\n{START_LINE}\n{snippet_code}\n{END_LINE}\n{test_code}")
                 .as_bytes(),
             )
             .await?;

@@ -21,6 +21,7 @@ pub struct Question {
     pub example_testcases: Option<String>,
     #[serde(rename = "sampleTestCase")]
     pub sample_test_case: String,
+    pub difficulty: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
