@@ -11,8 +11,7 @@ use crate::{
     domain::{CodeSnippet, Question},
     guest::guest_output,
     meta::{MetaData, MetaDataMethod, MetaDataType},
-    testcase::parse_test_cases,
-    util::parse_struct_name,
+    testcase::{parse_class_test_cases2, parse_test_cases},
 };
 use inflector::Inflector;
 
@@ -84,12 +83,8 @@ impl<'a> WriteTemplate<'a> {
 
                 let test_cases = into_test_cases_iter(test_cases, params.len())
                     .map(|test_case| {
-                        let params_str = test_case
-                            .into_iter()
-                            .zip(params.iter())
-                            .map(|(val, param)| format_val(val, &param.r#type))
-                            .collect::<Vec<String>>()
-                            .join(",");
+                        let params_str =
+                            format_params(test_case.iter(), params.iter().map(|p| &p.r#type));
                         let expects = output_iter
                             .next()
                             .map(|output| {
@@ -99,7 +94,7 @@ impl<'a> WriteTemplate<'a> {
                                     }
                                     _ => output.into(),
                                 };
-                                format_val(o, &r#return.r#type)
+                                format_val(&o, &r#return.r#type)
                             })
                             .unwrap_or_default();
 
@@ -127,7 +122,7 @@ impl<'a> WriteTemplate<'a> {
                 methods,
                 r#return,
             } => {
-                let struct_name = parse_struct_name(&self.snippet.code).unwrap_or("UnknowStruct");
+                // let struct_name = parse_struct_name(&self.snippet.code).unwrap_or("UnknowStruct");
 
                 self.import_code
                     .push("use crate::util::fs::{TestObject, assert_object};".into());
@@ -166,9 +161,29 @@ impl<'a> WriteTemplate<'a> {
                         format!("\"{name}\" => {{ {body} }}")
                      },
                 ).collect::<Vec<String>>().join("\n");
+
+                let mut output_iter = guest_output(&self.question.translated_content);
+
+                let (methods_json, params_json) = get_class_output(self.question)?;
+
+                let constructor_param = {
+                    let params = get_first_value(params_json).unwrap();
+                    format_params(
+                        params.as_array().unwrap().iter(),
+                        constructor.params.iter().map(|p| &p.r#type),
+                    )
+                };
+
+                let methods_json = format!("r#\"{}\"#", methods_json);
+                let params_json = format!("r#\"{}\"#", params_json);
+                let excepts_json = match output_iter.next() {
+                    Some(output) => format!("r#\"{}\"#", output),
+                    None => "".to_owned(),
+                };
+
                 let test_code = format!(
-                    r"
-            impl TestObject for {struct_name} {{
+                    r#"
+            impl TestObject for {classname} {{
                 fn call(&mut self, method: &str, params: &Vec<Value>) -> Option<Value> {{
                     match method {{
                         {method_code}
@@ -177,7 +192,16 @@ impl<'a> WriteTemplate<'a> {
                     None
                 }}
             }}
-            ",
+
+            #[test]
+            pub fn test_{classname}() {{
+                let methods = {methods_json};
+                let params = {params_json};
+                let excepts = {excepts_json};
+                let obj = {classname}::new({constructor_param});
+                assert_object(obj, methods, params, excepts);
+            }}
+            "#,
                 );
 
                 self.test_code = Some(test_code);
@@ -244,7 +268,7 @@ async fn cargo_fmt(project_dir: PathBuf) -> crate::errors::Result<()> {
     Ok(())
 }
 
-fn format_val(val: serde_json::Value, meta_type: &MetaDataType) -> String {
+fn format_val(val: &serde_json::Value, meta_type: &MetaDataType) -> String {
     match meta_type {
         MetaDataType::List(sub_meta_type) => {
             let array = match val {
@@ -287,4 +311,35 @@ fn into_test_cases_iter<'a>(
         }
         Some(list)
     })
+}
+
+fn get_class_output<'a>(question: &'a Question) -> Result<(&'a str, &'a str), anyhow::Error> {
+    let (method_str, params_str) = {
+        let test_cases_str = if let Some(s) = question.example_testcases.as_ref() {
+            s
+        } else {
+            &question.sample_test_case
+        };
+        parse_class_test_cases2(test_cases_str).unwrap()
+    };
+
+    Ok((method_str, params_str))
+}
+
+fn get_first_value(json: &str) -> Option<serde_json::Value> {
+    let params: serde_json::Value = serde_json::from_str(&json).ok()?;
+    match params {
+        serde_json::Value::Array(a) => a.into_iter().next(),
+        _ => None,
+    }
+}
+
+fn format_params<'a, 'b>(
+    vals: impl Iterator<Item = &'a serde_json::Value>,
+    param_types: impl Iterator<Item = &'b MetaDataType>,
+) -> String {
+    vals.zip(param_types)
+        .map(|(val, param_type)| format_val(val, param_type))
+        .collect::<Vec<String>>()
+        .join(",")
 }

@@ -12,6 +12,7 @@ pub fn parse_test_cases<'a>(s: &'a str) -> Result<impl Iterator<Item = serde_jso
     Ok(sp.map(|v| serde_json::from_str(v).unwrap()))
 }
 
+#[deprecated]
 pub fn parse_class_test_cases(s: &str) -> Result<impl Iterator<Item = ClassTestCase>> {
     let mut sp = s.split('\n');
 
@@ -32,6 +33,18 @@ pub fn parse_class_test_cases(s: &str) -> Result<impl Iterator<Item = ClassTestC
         Ok(iter)
     } else {
         bail!("parse test cases error")
+    }
+}
+
+pub fn parse_class_test_cases2<'a>(s: &'a str) -> Option<(&'a str, &'a str)> {
+    let mut sp = s.split('\n');
+
+    let n1 = sp.next();
+    let n2 = sp.next();
+    if let (Some(line1), Some(line2)) = (n1, n2) {
+        Some((line1, line2))
+    } else {
+        None
     }
 }
 

@@ -17,7 +17,7 @@ pub enum MetaData {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MetaDataConstructor {
-    params: Vec<MetaDataParam>,
+    pub params: Vec<MetaDataParam>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
