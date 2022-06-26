@@ -1,7 +1,7 @@
 use std::{env, process};
 
 use clap::Parser;
-use leetcode_tool::{fetch, template};
+use leetcode_tool::{fetch, submit, template};
 
 #[derive(Debug, clap::Subcommand)]
 enum Action {
@@ -18,17 +18,20 @@ struct Args {
 }
 
 fn main() -> Result<(), anyhow::Error> {
-    let args = Args::parse();
-    match args.action {
-        Action::Fetch { title } => async_std::task::block_on(async {
-            let question = fetch::fetch_question(title).await.unwrap();
-            let project_dir = env::current_dir().unwrap();
-            template::w::write_template(&question, project_dir)
-                .await
-                .unwrap();
-        }),
-        Action::Submit { title } => todo!(),
-        Action::Login => todo!(),
-    }
+    async_std::task::block_on(async {
+        let args = Args::parse();
+
+        match args.action {
+            Action::Fetch { title } => {
+                let question = fetch::fetch_question(title).await.unwrap();
+                let project_dir = env::current_dir().unwrap();
+                template::w::write_template(&question, project_dir)
+                    .await
+                    .unwrap();
+            }
+            Action::Submit { title } => submit::submit_code(&title).await.unwrap(),
+            Action::Login => todo!(),
+        }
+    });
     Ok(())
 }

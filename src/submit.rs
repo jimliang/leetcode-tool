@@ -1,11 +1,55 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::fetch::{graphql, GraphqlBody};
 use crate::template::{END_LINE, START_LINE};
-use anyhow::Ok;
+use anyhow::{Ok, bail};
 use async_std::prelude::*;
+use async_std::process::Command;
+use async_std::task::sleep;
 use async_std::{fs::File, io::BufReader, path::Path};
 use regex::Regex;
+
+pub async fn submit_code(title_slug: &str) -> Result<(), anyhow::Error> {
+    let title = title_slug.replace('-', "_");
+    let file = format!("src/{title}.rs");
+    let (title_slug, code) = read_content(&file).await?;
+
+    // submit
+    let submit_id = "";
+
+    for _ in 0..20 {
+        let CheckSubmissionsResponse {
+            state,
+            status_msg,
+            submission_id,
+            status_memory,
+            status_runtime,
+        } = check_submissions(submit_id).await?;
+        if state == "SUCCESS" {
+
+            if status_msg == Some("Wrong Answer".to_owned()) {
+                return bail!("{:?}", status_msg.unwrap());
+            } else {
+                // success
+
+                Command::new("git")
+                    .args(&["add", &file])
+                    .status()
+                    .await?;
+
+                Command::new("git")
+                    .args(&["commit", "-m", &format!("\"leetcode({title_slug}): {submission_id}, ({status_runtime}, {status_memory})\"")])
+                    .status()
+                    .await?;
+            }
+        } else {
+            sleep(Duration::from_secs(1)).await;
+        }
+    }
+
+    Ok(())
+}
 
 // pub async fn query_submissions(title_slug: &str) -> Result<_, anyhow::Error> {
 //   let mut variables = HashMap::new();
@@ -27,6 +71,9 @@ pub struct CheckSubmissionsResponse {
     /// PENDING, SUCCESS
     state: String,
     status_msg: Option<String>,
+    submission_id: String,
+    status_runtime: String,
+    status_memory: String,
 }
 
 pub async fn check_submissions(submit_id: &str) -> Result<CheckSubmissionsResponse, anyhow::Error> {
