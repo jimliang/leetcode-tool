@@ -1,6 +1,26 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env::current_dir};
+
+use anyhow::Ok;
+use async_std::{
+    fs::{create_dir_all, File},
+    io::WriteExt,
+    path::PathBuf,
+};
 
 use crate::{domain::Question, errors::Result};
+
+pub async fn get_backup_file(title_slug: String) -> Result<PathBuf> {
+    let p = async_std::task::spawn_blocking(move || {
+        let mut current_dir = current_dir().unwrap();
+
+        current_dir.push(format!(".backup/{title_slug}.json"));
+
+        current_dir
+    })
+    .await;
+
+    Ok(p.into())
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Response<T> {
@@ -13,6 +33,20 @@ struct QuestionWrapper {
 }
 
 pub async fn graphql<T: serde::de::DeserializeOwned>(body: GraphqlBody) -> Result<T> {
+    let mut file = if &body.operation_name == "questionData" {
+        Some(get_backup_file(body.variables.get("titleSlug").unwrap().clone()).await?)
+    } else {
+        None
+    };
+
+    if let Some(ref mut file) = file {
+        if file.exists().await {
+            // FIXME: sync api
+            let reader = std::fs::File::open(file)?;
+            let res: Response<T> = serde_json::from_reader(reader)?;
+            return Ok(res.data);
+        }
+    }
     // let headers = serde_json::json!({
     //   "accept": "*/*",
     //   "accept-language": "zh-CN",
@@ -25,7 +59,7 @@ pub async fn graphql<T: serde::de::DeserializeOwned>(body: GraphqlBody) -> Resul
     //   "x-timezone": "Asia/Shanghai",
     //   "referrer": "https://leetcode-cn.com/",
     // });
-    let mut builder = surf::post("https://leetcode-cn.com/graphql/");
+    let builder = surf::post("https://leetcode-cn.com/graphql/");
 
     // if let serde_json::Value::Object(map) = headers {
     //     for (k, v) in map {
@@ -33,19 +67,29 @@ pub async fn graphql<T: serde::de::DeserializeOwned>(body: GraphqlBody) -> Resul
     //     }
     // }
 
-    let res = builder.body_json(&body).unwrap().await;
+    if let Some(file) = file {
+        let res = builder
+            .body_json(&body)
+            .unwrap()
+            .recv_string()
+            .await
+            .unwrap();
+        create_dir_all(file.parent().unwrap()).await?;
+        let mut f = File::create(file).await?;
+        let _ = f.write(res.as_bytes()).await?;
 
-    // println!("--> res {:?}", res);
+        Ok(serde_json::from_str(&res).unwrap())
+    } else {
+        let res: Response<T> = builder
+            .body_json(&body)
+            .unwrap()
+            .await
+            .unwrap()
+            .body_json()
+            .await
+            .unwrap();
 
-    match res {
-        Ok(mut resp) => {
-            let r: Response<T> = resp.body_json().await.expect("resp parse error");
-            Ok(r.data)
-            // let r = resp.body_string().await;
-            // println!("error: {:?}", r);
-            // Err(crate::errors::Error::Empty)
-        }
-        Err(err) => panic!("http graphql error: {:?}", err),
+        Ok(res.data)
     }
 }
 
