@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::fetch::{graphql, GraphqlBody};
+use crate::fetch::fetch_question;
+use crate::leetcode::{check_submissions, submit, CheckSubmissionsResponse, SubmitResponse};
 use crate::template::{END_LINE, START_LINE};
 use anyhow::{bail, Ok, Result};
 use async_std::prelude::*;
@@ -15,13 +15,19 @@ pub async fn submit_code(title_slug: &str) -> Result<()> {
     let file = format!("src/{title}.rs");
     let (title_slug, code) = read_content(&file).await?;
 
-    // submit
-    let submit_id = "";
+    let question = fetch_question(&title_slug).await?;
+
+    let submit_resp = submit(&question, &code).await?;
+
+    let submission_id = match submit_resp {
+        SubmitResponse::SUCCESS { submission_id } => submission_id,
+        SubmitResponse::ERROR { error } => return Err(anyhow::anyhow!(error)),
+    };
 
     for _ in 0..20 {
-        let resp = check_submissions(submit_id).await?;
+        let resp = check_submissions(submission_id).await?;
         match resp {
-            CheckSubmissionsResponse::PENDING => {
+            CheckSubmissionsResponse::STARTED | CheckSubmissionsResponse::PENDING => {
                 sleep(Duration::from_secs(1)).await;
             }
             CheckSubmissionsResponse::SUCCESS {
@@ -29,6 +35,7 @@ pub async fn submit_code(title_slug: &str) -> Result<()> {
                 submission_id,
                 status_runtime,
                 status_memory,
+                ..
             } => {
                 if &status_msg == "Wrong Answer" {
                     bail!("{:?}", status_msg);
@@ -47,44 +54,6 @@ pub async fn submit_code(title_slug: &str) -> Result<()> {
     }
 
     Ok(())
-}
-
-// pub async fn query_submissions(title_slug: &str) -> Result<_> {
-//   let mut variables = HashMap::new();
-//   variables.insert("questionSlug".to_owned(), title_slug);
-//   variables.insert("offset".to_owned(), "0");
-//   variables.insert("limit".to_owned(), "40");
-
-//   graphql(GraphqlBody {
-//     operation_name: "submissions".to_owned(),
-//     variables,
-//     query:
-//   }).await
-// }
-
-/// PENDING, SUCCESS
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "state")]
-pub enum CheckSubmissionsResponse {
-    PENDING,
-    SUCCESS {
-        status_msg: String,
-        submission_id: String,
-        status_runtime: String,
-        status_memory: String,
-    },
-}
-
-pub async fn check_submissions(submit_id: &str) -> Result<CheckSubmissionsResponse> {
-    let builder = surf::get(format!(
-        "https://leetcode.cn/submissions/detail/{submit_id}/check/"
-    ));
-
-    let res = builder.recv_string().await.unwrap();
-
-    println!("res {:?}", res);
-
-    Ok(serde_json::from_str(&res).unwrap())
 }
 
 async fn read_content<P: AsRef<Path>>(file: P) -> Result<(String, String)> {
@@ -135,14 +104,6 @@ mod tests {
             let c = read_content("src/random_pick_with_blacklist.rs")
                 .await
                 .unwrap();
-            println!("{:?}", c);
-        })
-    }
-
-    #[test]
-    fn test_check() {
-        async_std::task::block_on(async {
-            let c = check_submissions("329320745").await.unwrap();
             println!("{:?}", c);
         })
     }

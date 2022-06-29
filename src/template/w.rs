@@ -82,7 +82,14 @@ impl<'a> WriteTemplate<'a> {
                 let method_name = name.to_snake_case();
 
                 let test_cases = into_test_cases_iter(test_cases, params.len())
-                    .map(|test_case| {
+                    .enumerate()
+                    .map(|(i, test_case)| {
+                        // if r#return.r#type == MetaDataType::Void {
+                        //     format!(r"
+                        //         let mut param{i} =
+                        //         let res{i}
+                        //     ")
+                        // }
                         let params_str =
                             format_params(test_case.iter(), params.iter().map(|p| &p.r#type));
                         let expects = output_iter
@@ -120,7 +127,7 @@ impl<'a> WriteTemplate<'a> {
                 classname,
                 constructor,
                 methods,
-                r#return,
+                r#return: _,
             } => {
                 // let struct_name = parse_struct_name(&self.snippet.code).unwrap_or("UnknowStruct");
 

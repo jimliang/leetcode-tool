@@ -24,7 +24,7 @@ async fn main_inner() -> Result<()> {
     match args.action {
         Action::Fetch { title } => {
             let title = get_title_slug(&title);
-            let question = fetch::fetch_question(title.clone().into_owned()).await?;
+            let question = fetch::fetch_question(&title).await?;
             let project_dir = env::current_dir()?;
             let file_path = template::w::write_template(&question, project_dir).await?;
             log::info!("Fetched project {}", title);
@@ -42,7 +42,7 @@ fn main() {
     pretty_env_logger::init();
     async_std::task::block_on(async {
         if let Err(error) = main_inner().await {
-            eprintln!("{:?}", error);
+            log::error!("{:?}", error);
         }
     });
 }

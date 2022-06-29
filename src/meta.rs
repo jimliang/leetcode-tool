@@ -32,6 +32,14 @@ pub struct MetaDataReturn {
     #[serde(rename = "type")]
     #[serde(with = "type_serde")]
     pub r#type: MetaDataType,
+
+    pub output: Option<MetaDataReturnOutput>,
+    manual: Option<bool>,
+}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+
+pub struct MetaDataReturnOutput {
+    paramindex: usize,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum MetaDataType {
