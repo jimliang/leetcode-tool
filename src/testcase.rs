@@ -6,7 +6,7 @@ pub struct ClassTestCase {
     params: Vec<String>,
 }
 
-pub fn parse_test_cases<'a>(s: &'a str) -> Result<impl Iterator<Item = serde_json::Value> + 'a> {
+pub fn parse_test_cases(s: &str) -> Result<impl Iterator<Item = serde_json::Value> + '_> {
     let sp = s.split('\n');
     // Ok(sp.map(|b |b.to_owned()))
     Ok(sp.map(|v| serde_json::from_str(v).unwrap()))
@@ -36,7 +36,7 @@ pub fn parse_class_test_cases(s: &str) -> Result<impl Iterator<Item = ClassTestC
     }
 }
 
-pub fn parse_class_test_cases2<'a>(s: &'a str) -> Option<(&'a str, &'a str)> {
+pub fn parse_class_test_cases2(s: &str) -> Option<(&str, &str)> {
     let mut sp = s.split('\n');
 
     let n1 = sp.next();

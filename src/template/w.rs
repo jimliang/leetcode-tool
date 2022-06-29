@@ -137,11 +137,11 @@ impl<'a> WriteTemplate<'a> {
 
                         let param_lines = params.iter().enumerate().map(|(i, param)| {
                             let s = match param.r#type {
-                                MetaDataType::Integer => format!("params[${i}].as_i64().unwrap() as i32"),
+                                MetaDataType::Integer => format!("params[{i}].as_i64().unwrap() as i32"),
                                 _ => "".into(),
                             };
 
-                            format!("let p${i} = ${s};")
+                            format!("let p{i} = {s};")
                         }).collect::<Vec<String>>();
                         let res = match r#return.r#type {
                             MetaDataType::Bool => Some("Value::Bool(res)".to_owned()),
@@ -239,10 +239,10 @@ impl<'a> WriteTemplate<'a> {
         )
     }
 
-    async fn write_to(&mut self, project_dir: PathBuf) -> Result<(), anyhow::Error> {
+    async fn write_to(&mut self, project_dir: PathBuf) -> Result<PathBuf, anyhow::Error> {
         let is_class = self.generate_test_code()?;
         let file_path = project_dir.join(format!("src/{}.rs", self.title));
-        let file = File::create(file_path).await?;
+        let file = File::create(&file_path).await?;
         let mut buf_writer = BufWriter::new(file);
 
         let import_code = self.import_code.join("\n");
@@ -271,17 +271,17 @@ impl<'a> WriteTemplate<'a> {
         lib_file.flush().await?;
 
         cargo_fmt(project_dir).await?;
-        Ok(())
+        Ok(file_path)
     }
 }
 
 pub async fn write_template(
     question: &Question,
     project_dir: PathBuf,
-) -> crate::errors::Result<()> {
+) -> crate::errors::Result<PathBuf> {
     let mut wt = WriteTemplate::new(question)?;
-    wt.write_to(project_dir).await?;
-    Ok(())
+    let pb = wt.write_to(project_dir).await?;
+    Ok(pb)
 }
 
 async fn cargo_fmt(project_dir: PathBuf) -> crate::errors::Result<()> {

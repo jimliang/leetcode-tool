@@ -71,14 +71,16 @@ pub async fn graphql<T: serde::de::DeserializeOwned>(body: GraphqlBody) -> Resul
         let res = builder
             .body_json(&body)
             .unwrap()
-            .recv_string()
+            .recv_bytes()
             .await
             .unwrap();
         create_dir_all(file.parent().unwrap()).await?;
         let mut f = File::create(file).await?;
-        let _ = f.write(res.as_bytes()).await?;
+        let _ = f.write(&res).await?;
 
-        Ok(serde_json::from_str(&res).unwrap())
+        let res: Response<T> = serde_json::from_slice(&res).unwrap();
+
+        Ok(res.data)
     } else {
         let res: Response<T> = builder
             .body_json(&body)

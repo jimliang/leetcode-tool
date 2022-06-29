@@ -3,14 +3,14 @@ use std::time::Duration;
 
 use crate::fetch::{graphql, GraphqlBody};
 use crate::template::{END_LINE, START_LINE};
-use anyhow::{Ok, bail};
+use anyhow::{bail, Ok, Result};
 use async_std::prelude::*;
 use async_std::process::Command;
 use async_std::task::sleep;
 use async_std::{fs::File, io::BufReader, path::Path};
 use regex::Regex;
 
-pub async fn submit_code(title_slug: &str) -> Result<(), anyhow::Error> {
+pub async fn submit_code(title_slug: &str) -> Result<()> {
     let title = title_slug.replace('-', "_");
     let file = format!("src/{title}.rs");
     let (title_slug, code) = read_content(&file).await?;
@@ -19,39 +19,37 @@ pub async fn submit_code(title_slug: &str) -> Result<(), anyhow::Error> {
     let submit_id = "";
 
     for _ in 0..20 {
-        let CheckSubmissionsResponse {
-            state,
-            status_msg,
-            submission_id,
-            status_memory,
-            status_runtime,
-        } = check_submissions(submit_id).await?;
-        if state == "SUCCESS" {
-
-            if status_msg == Some("Wrong Answer".to_owned()) {
-                return bail!("{:?}", status_msg.unwrap());
-            } else {
-                // success
-
-                Command::new("git")
-                    .args(&["add", &file])
-                    .status()
-                    .await?;
-
-                Command::new("git")
-                    .args(&["commit", "-m", &format!("\"leetcode({title_slug}): {submission_id}, ({status_runtime}, {status_memory})\"")])
-                    .status()
-                    .await?;
+        let resp = check_submissions(submit_id).await?;
+        match resp {
+            CheckSubmissionsResponse::PENDING => {
+                sleep(Duration::from_secs(1)).await;
             }
-        } else {
-            sleep(Duration::from_secs(1)).await;
+            CheckSubmissionsResponse::SUCCESS {
+                status_msg,
+                submission_id,
+                status_runtime,
+                status_memory,
+            } => {
+                if &status_msg == "Wrong Answer" {
+                    bail!("{:?}", status_msg);
+                } else {
+                    // success
+
+                    Command::new("git").args(&["add", &file]).status().await?;
+
+                    Command::new("git")
+                        .args(&["commit", "-m", &format!("\"leetcode({title_slug}): {submission_id}, ({status_runtime}, {status_memory})\"")])
+                        .status()
+                        .await?;
+                }
+            }
         }
     }
 
     Ok(())
 }
 
-// pub async fn query_submissions(title_slug: &str) -> Result<_, anyhow::Error> {
+// pub async fn query_submissions(title_slug: &str) -> Result<_> {
 //   let mut variables = HashMap::new();
 //   variables.insert("questionSlug".to_owned(), title_slug);
 //   variables.insert("offset".to_owned(), "0");
@@ -64,19 +62,20 @@ pub async fn submit_code(title_slug: &str) -> Result<(), anyhow::Error> {
 //   }).await
 // }
 
-
-
+/// PENDING, SUCCESS
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CheckSubmissionsResponse {
-    /// PENDING, SUCCESS
-    state: String,
-    status_msg: Option<String>,
-    submission_id: String,
-    status_runtime: String,
-    status_memory: String,
+#[serde(tag = "state")]
+pub enum CheckSubmissionsResponse {
+    PENDING,
+    SUCCESS {
+        status_msg: String,
+        submission_id: String,
+        status_runtime: String,
+        status_memory: String,
+    },
 }
 
-pub async fn check_submissions(submit_id: &str) -> Result<CheckSubmissionsResponse, anyhow::Error> {
+pub async fn check_submissions(submit_id: &str) -> Result<CheckSubmissionsResponse> {
     let builder = surf::get(format!(
         "https://leetcode.cn/submissions/detail/{submit_id}/check/"
     ));
@@ -88,7 +87,7 @@ pub async fn check_submissions(submit_id: &str) -> Result<CheckSubmissionsRespon
     Ok(serde_json::from_str(&res).unwrap())
 }
 
-async fn read_content<P: AsRef<Path>>(file: P) -> Result<(String, String), anyhow::Error> {
+async fn read_content<P: AsRef<Path>>(file: P) -> Result<(String, String)> {
     lazy_static::lazy_static! {
         static ref RE: Regex = Regex::new(r"leetcode-cn.com/problems/(\S+)/").unwrap();
     }
