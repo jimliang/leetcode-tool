@@ -39,6 +39,7 @@ async fn main_inner() -> Result<()> {
 }
 
 fn main() {
+    dotenv::dotenv().ok();
     pretty_env_logger::init();
     async_std::task::block_on(async {
         if let Err(error) = main_inner().await {

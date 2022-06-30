@@ -1,14 +1,17 @@
-use std::collections::HashMap;
-
-use anyhow::Result;
+use anyhow::{Ok, Result};
 
 use crate::domain::Question;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Response<T> {
+    pub data: T,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GraphqlBody<'a> {
     #[serde(rename = "operationName")]
-    pub operation_name: &'a str,
-    pub variables: HashMap<&'a str, &'a str>,
+    pub operation_name: Option<&'a str>,
+    pub variables: serde_json::Value,
     pub query: &'a str,
 }
 
@@ -77,6 +80,27 @@ pub enum CheckSubmissionsResponse {
         task_name: String,
     },
 }
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct QuestionRecord {
+    date: String,
+    question: Option<QuestionRecordQuestion>,
+    userStatus: QuestionRecordStatus,
+}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct QuestionRecordQuestion {
+    questionFrontendId: String,
+    title: String,
+    titleSlug: String,
+    translatedTitle: String,
+    lastSubmission: Option<String>,
+}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum QuestionRecordStatus {
+    #[serde(rename = "NOT_START")]
+    NotStart,
+    #[serde(rename = "FINISH")]
+    Finish,
+}
 
 pub async fn check_submissions(submit_id: usize) -> Result<CheckSubmissionsResponse> {
     let builder = surf::get(format!(
@@ -90,6 +114,42 @@ pub async fn check_submissions(submit_id: usize) -> Result<CheckSubmissionsRespo
     Ok(serde_json::from_str(&res).unwrap())
 }
 
+pub async fn daily_question_records(month: usize, year: usize) -> Result<Vec<QuestionRecord>> {
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    struct DailyQuestionRecordsWrapper {
+        dailyQuestionRecords: Vec<QuestionRecord>,
+    }
+
+    let mut resp = graphql(&GraphqlBody {
+        query: "\n    query dailyQuestionRecords($year: Int!, $month: Int!) {\n  dailyQuestionRecords(year: $year, month: $month) {\n    date\n    userStatus\n    question {\n      questionFrontendId\n      title\n      titleSlug\n      translatedTitle\n    }\n  }\n}\n    ",
+        variables: serde_json::json!({
+            "month": month,
+            "year": year,
+        }),
+        operation_name: None,
+    }).await?;
+
+    let data: Response<DailyQuestionRecordsWrapper> = resp.body_json().await.unwrap();
+
+    Ok(data.data.dailyQuestionRecords)
+}
+
+pub async fn question_of_today() -> Result<Vec<QuestionRecord>> {
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    struct ResponseWrapper {
+        todayRecord: Vec<QuestionRecord>,
+    }
+
+    let mut resp = graphql(&GraphqlBody {
+        query: "\n    query questionOfToday {\n  todayRecord {\n    date\n    userStatus\n    question {\n      questionId\n      frontendQuestionId: questionFrontendId\n      difficulty\n      title\n      titleCn: translatedTitle\n      titleSlug\n      paidOnly: isPaidOnly\n      freqBar\n      isFavor\n      acRate\n      status\n      solutionNum\n      hasVideoSolution\n      topicTags {\n        name\n        nameTranslated: translatedName\n        id\n      }\n      extra {\n        topCompanyTags {\n          imgUrl\n          slug\n          numSubscribed\n        }\n      }\n    }\n    lastSubmission {\n      id\n    }\n  }\n}\n    ",
+        variables: serde_json::json!({}),
+        operation_name: None,
+    }).await?;
+
+    let data: Response<ResponseWrapper> = resp.body_json().await.unwrap();
+
+    Ok(data.data.todayRecord)
+}
 #[cfg(test)]
 mod tests {
     use super::*;

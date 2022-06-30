@@ -3,31 +3,45 @@ use std::borrow::Cow;
 use lazy_static::lazy_static;
 use regex::Regex;
 
-pub fn guest_output<'a>(s: &'a str) -> impl Iterator<Item = Cow<'a, str>> {
+fn read_output(line: &str) -> Option<&str> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r"输出(:|：)\s?(\S+)").unwrap();
+        static ref RE: Regex = Regex::new(r"输出(:|：)?").unwrap();
     }
+    let mut split_iter = RE.split(line);
+    let _ = split_iter.next();
 
-    let mut iter = s.split("\n");
+    match split_iter.next() {
+        Some(line) if !line.is_empty() => Some(line.trim()),
+        _ => None,
+    }
+}
+
+pub fn guest_output(s: &str) -> impl Iterator<Item = Cow<'_, str>> {
+    // lazy_static! {
+    //     static ref RE: Regex = Regex::new(r"输出(:|：)\s?(\S+)").unwrap();
+    // }
+
+    let mut iter = s.split('\n');
+    let mut capture_next = false;
     (0..).map_while(move |_| loop {
         match iter.next() {
-            Some(line) if line.contains("输出") => {
-                let mut captures_iter = RE.captures_iter(line);
-                return match captures_iter.next() {
-                    Some(caps) => {
-                        let st = caps.get(2).unwrap().as_str();
-                        Some(pure_output(st))
-                    }
-                    None => iter.next().map(|line| Cow::Borrowed(line)),
-                };
+            Some(line) if capture_next => {
+                capture_next = false;
+                return Some(Cow::Borrowed(line.trim()));
             }
+            Some(line) if line.contains("输出") => match read_output(&pure_output(line)) {
+                Some(r) => return Some(r.to_owned().into()),
+                None => {
+                    capture_next = true;
+                }
+            },
             Some(_) => {}
             None => return None,
         }
     })
 }
 
-fn pure_output<'a>(s: &'a str) -> Cow<'a, str> {
+fn pure_output(s: &str) -> Cow<'_, str> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"<[^>]+>").unwrap();
     }
@@ -54,4 +68,17 @@ mod tests {
             vec!["[null, 0, 4, 1, 6, 1, 0, 4]"]
         );
     }
+
+    // #[test]
+    // fn test_guest_output3() {
+    //     use crate::fetch::{QuestionWrapper, Response};
+    //     let content = include_str!("../.backup/my-calendar-iii.json");
+    //     let json: Response<QuestionWrapper> = serde_json::from_str(content).unwrap();
+    //     println!(
+    //         "--> translated_content: {:?}",
+    //         json.data.question.translated_content
+    //     );
+    //     let iter = guest_output(&json.data.question.translated_content);
+    //     assert_eq!(iter.collect::<Vec<_>>(), vec!["[null, 1, 1, 2, 3, 3, 3]"]);
+    // }
 }

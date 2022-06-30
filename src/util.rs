@@ -15,7 +15,7 @@ pub fn parse_struct_name(s: &str) -> Option<&str> {
     None
 }
 
-pub fn get_title_slug<'a>(s: &'a str) -> Cow<'a, str> {
+pub fn get_title_slug(s: &str) -> Cow<'_, str> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"leetcode-cn.com/problems/([\d\w\-]+)").unwrap();
     }

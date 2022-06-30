@@ -10,7 +10,7 @@ use async_std::{
 use crate::{
     domain::Question,
     errors::Result,
-    leetcode::{graphql, GraphqlBody},
+    leetcode::{graphql, GraphqlBody, Response},
 };
 
 pub async fn get_backup_file(title_slug: &str) -> Result<PathBuf> {
@@ -28,17 +28,12 @@ pub async fn get_backup_file(title_slug: &str) -> Result<PathBuf> {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Response<T> {
-    pub data: T,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct QuestionWrapper {
-    question: Question,
+pub struct QuestionWrapper {
+    pub question: Question,
 }
 
 pub async fn fetch_question(title_slug: &str) -> Result<Question> {
-    let cache_file = get_backup_file(&title_slug).await?;
+    let cache_file = get_backup_file(title_slug).await?;
 
     if cache_file.exists().await {
         // FIXME: sync api
@@ -47,11 +42,11 @@ pub async fn fetch_question(title_slug: &str) -> Result<Question> {
         return Ok(res.data.question);
     };
 
-    let mut variables = HashMap::new();
-    variables.insert("titleSlug", title_slug);
     let mut res = graphql(&GraphqlBody {
-        operation_name: "questionData",
-        variables,
+        operation_name: Some("questionData"),
+        variables: serde_json::json!({
+            "titleSlug": title_slug
+        }),
         query: "query questionData($titleSlug: String!) {\n question(titleSlug: $titleSlug) {\n questionId\n questionFrontendId\n boundTopicId\n title\n titleSlug\n content\n translatedTitle\n translatedContent\n isPaidOnly\n difficulty\n likes\n dislikes\n isLiked\n similarQuestions\n contributors {\n username\n profileUrl\n avatarUrl\n __typename\n }\n langToValidPlayground\n topicTags {\n name\n slug\n translatedName\n __typename\n }\n companyTagStats\n codeSnippets {\n lang\n langSlug\n code\n __typename\n }\n stats\n hints\n solution {\n id\n canSeeDetail\n __typename\n }\n status\n sampleTestCase\n metaData\n judgerAvailable\n judgeType\n mysqlSchemas\n enableRunCode\n envInfo\n book {\n id\n bookName\n pressName\n source\n shortDescription\n fullDescription\n bookImgUrl\n pressImgUrl\n productUrl\n __typename\n }\n isSubscribed\n isDailyQuestion\n dailyRecordStatus\n editorType\n ugcQuestionId\n style\n exampleTestcases\n __typename\n }\n}\n"
     }).await?;
 
