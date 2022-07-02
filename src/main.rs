@@ -1,6 +1,6 @@
 use std::env;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 use leetcode_tool::{fetch, submit, template, util::get_title_slug};
 
@@ -24,16 +24,22 @@ async fn main_inner() -> Result<()> {
     match args.action {
         Action::Fetch { title } => {
             let title = get_title_slug(&title);
+            println!("start to fetch project {}", title);
             let question = fetch::fetch_question(&title).await?;
             let project_dir = env::current_dir()?;
             let file_path = template::w::write_template(&question, project_dir).await?;
-            log::info!("Fetched project {}", title);
-            log::info!("{}", file_path.display());
+            println!("> {}", file_path.display());
         }
         Action::Submit { title } => {
+            let cookie = match std::env::var("COOKIE") {
+                Ok(c) => c,
+                Err(_) => bail!(
+                    "neet to set cookie for login leetcode by `export COOKIE=<LEETCODE-COOKIE>`"
+                ),
+            };
             let title = get_title_slug(&title);
-            submit::submit_code(&title).await?
-        } // Action::Login => todo!(),
+            submit::submit_code(&title, &cookie).await?
+        }
     }
     Ok(())
 }

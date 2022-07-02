@@ -30,7 +30,7 @@ pub enum SubmitResponse {
     ERROR { error: String },
 }
 
-pub async fn submit(question: &Question, code: &str) -> Result<SubmitResponse> {
+pub async fn submit(question: &Question, code: &str, cookie: &str) -> Result<SubmitResponse> {
     // let _ = match question.code_snippets.iter().find(|c| c.lang == "Rust") {
     //     Some(snippet) => snippet,
     //     None => bail!("Fail to get Rust code Snippet"),
@@ -49,7 +49,8 @@ pub async fn submit(question: &Question, code: &str) -> Result<SubmitResponse> {
             "typed_code": code,
         }))
         .unwrap()
-        .header("cookie", std::env::var("COOKIE").unwrap())
+        // .header("cookie", std::env::var("COOKIE").unwrap())
+        .header("cookie", cookie)
         .header(
             "Referer",
             format!("https://leetcode.cn/problems/{title_slug}/"),

@@ -10,14 +10,14 @@ use async_std::task::sleep;
 use async_std::{fs::File, io::BufReader, path::Path};
 use regex::Regex;
 
-pub async fn submit_code(title_slug: &str) -> Result<()> {
+pub async fn submit_code(title_slug: &str, cookie: &str) -> Result<()> {
     let title = title_slug.replace('-', "_");
     let file = format!("src/{title}.rs");
     let (title_slug, code) = read_content(&file).await?;
 
     let question = fetch_question(&title_slug).await?;
 
-    let submit_resp = submit(&question, &code).await?;
+    let submit_resp = submit(&question, &code, cookie).await?;
 
     let submission_id = match submit_resp {
         SubmitResponse::SUCCESS { submission_id } => submission_id,
@@ -45,9 +45,11 @@ pub async fn submit_code(title_slug: &str) -> Result<()> {
                     Command::new("git").args(&["add", &file]).status().await?;
 
                     Command::new("git")
-                        .args(&["commit", "-m", &format!("\"leetcode({title_slug}): {submission_id}, ({status_runtime}, {status_memory})\"")])
+                        .args(&["commit", "-m", &format!("leetcode({title_slug}): {submission_id}, ({status_runtime}, {status_memory})")])
                         .status()
                         .await?;
+
+                    println!("success({title_slug}): {submission_id}, ({status_runtime}, {status_memory})")
                 }
             }
         }
