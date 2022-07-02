@@ -2,11 +2,11 @@ use std::env;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use leetcode_tool::{fetch, submit, template, util::get_title_slug};
+use leetcode_tool::{fetch, leetcode::question_of_today, submit, template, util::get_title_slug};
 
 #[derive(Debug, clap::Subcommand)]
 enum Action {
-    Fetch { title: String },
+    Fetch { title: Option<String> },
     Submit { title: String },
     // Login,
 }
@@ -23,6 +23,18 @@ async fn main_inner() -> Result<()> {
 
     match args.action {
         Action::Fetch { title } => {
+            let title = match title {
+                Some(t) => get_title_slug(&t).into_owned(),
+                None => {
+                    let question = question_of_today().await?;
+                    let title_slug = question
+                        .get(0)
+                        .and_then(|q| q.question.as_ref())
+                        .map(|q| &q.titleSlug)
+                        .expect("can not find today's question");
+                    title_slug.to_owned()
+                }
+            };
             let title = get_title_slug(&title);
             println!("start to fetch project {}", title);
             let question = fetch::fetch_question(&title).await?;
