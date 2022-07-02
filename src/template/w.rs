@@ -1,6 +1,6 @@
 use std::{path::PathBuf, process::Command};
 
-use anyhow::{bail, Ok};
+use anyhow::{bail, Result};
 use async_std::{
     fs::{File, OpenOptions},
     io::BufWriter,
@@ -78,12 +78,23 @@ impl<'a> WriteTemplate<'a> {
                     parse_test_cases(test_cases_str)?
                 };
 
-                let mut output_iter = guest_output(&self.question.translated_content);
+                let mut output_iter =
+                    guest_output(&self.question.translated_content).filter_map(|output| {
+                        let o = match r#return.r#type {
+                            MetaDataType::Integer => {
+                                let num = output.parse().ok()?;
+                                serde_json::Value::Number(num)
+                            }
+
+                            _ => serde_json::from_str(&output).ok()?,
+                        };
+                        format_val(&o, &r#return.r#type).ok()
+                    });
                 let method_name = name.to_snake_case();
 
                 let test_cases = into_test_cases_iter(test_cases, params.len())
-                    .enumerate()
-                    .map(|(i, test_case)| {
+                    // .enumerate()
+                    .map(|test_case| {
                         // if r#return.r#type == MetaDataType::Void {
                         //     format!(r"
                         //         let mut param{i} =
@@ -92,18 +103,7 @@ impl<'a> WriteTemplate<'a> {
                         // }
                         let params_str =
                             format_params(test_case.iter(), params.iter().map(|p| &p.r#type));
-                        let expects = output_iter
-                            .next()
-                            .map(|output| {
-                                let o = match r#return.r#type {
-                                    MetaDataType::Integer => {
-                                        serde_json::Value::Number(output.parse().unwrap())
-                                    }
-                                    _ => output.into(),
-                                };
-                                format_val(&o, &r#return.r#type)
-                            })
-                            .unwrap_or_default();
+                        let expects = output_iter.next().unwrap_or_default();
 
                         format!("assert_eq!(Solution::{method_name}({params_str}), {expects});")
                     })
@@ -303,18 +303,26 @@ async fn cargo_fmt(project_dir: PathBuf) -> crate::errors::Result<()> {
     Ok(())
 }
 
-fn format_val(val: &serde_json::Value, meta_type: &MetaDataType) -> String {
-    match meta_type {
+fn format_val(val: &serde_json::Value, meta_type: &MetaDataType) -> Result<String> {
+    let v = match meta_type {
         MetaDataType::List(sub_meta_type) => {
             let array = match val {
                 serde_json::Value::Array(a) => a,
-                _ => panic!("parse error: {} {:?}", val, meta_type),
+                _ => {
+                    bail!("format_val parse error: {} {:?}", val, meta_type);
+                }
             };
             format!(
                 "vec![{}]",
                 array
                     .into_iter()
-                    .map(|v| format_val(v, &sub_meta_type))
+                    .filter_map(|v| match format_val(v, &sub_meta_type) {
+                        Ok(o) => Some(o),
+                        Err(err) => {
+                            log::warn!("format_val: {:?}", err);
+                            None
+                        }
+                    })
                     .collect::<Vec<String>>()
                     .join(",")
             )
@@ -326,10 +334,11 @@ fn format_val(val: &serde_json::Value, meta_type: &MetaDataType) -> String {
             format!("TreeNode::from_jsonstr(\"{}\")", val)
         }
         MetaDataType::Character => format!("'{}'", val),
-        MetaDataType::String => format!("\"{}\".to_owned()", val),
-        MetaDataType::Unknow(t) => panic!("Unknow MetaType {}", t),
+        MetaDataType::String => format!("{}.to_owned()", val),
+        MetaDataType::Unknow(t) => bail!("Unknow MetaType {}", t),
         _ => val.to_string(),
-    }
+    };
+    Ok(v)
 }
 
 fn into_test_cases_iter<'a>(
@@ -374,7 +383,13 @@ fn format_params<'a, 'b>(
     param_types: impl Iterator<Item = &'b MetaDataType>,
 ) -> String {
     vals.zip(param_types)
-        .map(|(val, param_type)| format_val(val, param_type))
+        .filter_map(|(val, param_type)| match format_val(val, param_type) {
+            Ok(o) => Some(o),
+            Err(err) => {
+                log::warn!("format_params: {:?}", err);
+                None
+            }
+        })
         .collect::<Vec<String>>()
         .join(",")
 }

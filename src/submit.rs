@@ -49,7 +49,8 @@ pub async fn submit_code(title_slug: &str, cookie: &str) -> Result<()> {
                         .status()
                         .await?;
 
-                    println!("success({title_slug}): {submission_id}, ({status_runtime}, {status_memory})")
+                    println!("success({title_slug}): {submission_id}, ({status_runtime}, {status_memory})");
+                    break;
                 }
             }
         }
