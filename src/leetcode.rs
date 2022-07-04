@@ -74,10 +74,12 @@ pub enum CheckSubmissionsResponse {
         submission_id: String,
         status_runtime: String,
         status_memory: String,
-        memory_percentile: f32,
-        runtime_percentile: f32,
-        total_testcases: usize,
+        memory_percentile: Option<f32>,
+        runtime_percentile: Option<f32>,
+        total_testcases: Option<usize>,
         task_name: String,
+        compile_error: Option<String>,
+        full_compile_error: Option<String>,
     },
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -159,5 +161,14 @@ mod tests {
             let c = check_submissions(329320745).await.unwrap();
             println!("{:?}", c);
         })
+    }
+
+    #[test]
+    fn test_parse() {
+        let s = "{\"status_code\": 20, \"lang\": \"rust\", \"run_success\": false, \"compile_error\": \"Line 35, Char 35: use of unstable library feature 'int_abs_diff' (solution.rs)\", \"full_compile_error\": \"Line 35, Char 35: use of unstable library feature 'int_abs_diff' (solution.rs)\\n   |\\n35 |             let min_val = list[0].abs_diff(list[1]);\\n   |                                   ^^^^^^^^\\n   |\\n   = note: see issue #89492 <https://github.com/rust-lang/rust/issues/89492> for more information\\nFor more information about this error, try `rustc --explain E0658`.\\nerror: could not compile `prog` due to previous error\\nmv: cannot stat '/leetcode/rust_compile/target/release/prog': No such file or directory\", \"status_runtime\": \"N/A\", \"memory\": 0, \"question_id\": \"1306\", \"task_finish_time\": 1656920071929, \"elapsed_time\": 0, \"task_name\": \"judger.judgetask.Judge\", \"finished\": true, \"status_msg\": \"Compile Error\", \"state\": \"SUCCESS\", \"fast_submit\": false, \"total_correct\": null, \"total_testcases\": null, \"submission_id\": \"332499557\", \"runtime_percentile\": null, \"status_memory\": \"N/A\", \"memory_percentile\": null, \"pretty_lang\": \"Rust\"}";
+
+        let ss: CheckSubmissionsResponse = serde_json::from_str(s).unwrap();
+
+        println!("{:?}", ss);
     }
 }

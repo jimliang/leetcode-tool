@@ -35,8 +35,13 @@ pub async fn submit_code(title_slug: &str) -> Result<()> {
                 submission_id,
                 status_runtime,
                 status_memory,
+                full_compile_error,
                 ..
             } => {
+                if let Some(compile_error) = full_compile_error {
+                    eprintln!(">> {}", compile_error);
+                    bail!("{:?}", status_msg);
+                }
                 if &status_msg == "Wrong Answer" {
                     bail!("{:?}", status_msg);
                 } else {
