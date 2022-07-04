@@ -30,7 +30,7 @@ pub enum SubmitResponse {
     ERROR { error: String },
 }
 
-pub async fn submit(question: &Question, code: &str) -> Result<SubmitResponse> {
+pub async fn submit(question: &Question, code: &str, cookie: &str) -> Result<SubmitResponse> {
     // let _ = match question.code_snippets.iter().find(|c| c.lang == "Rust") {
     //     Some(snippet) => snippet,
     //     None => bail!("Fail to get Rust code Snippet"),
@@ -49,7 +49,8 @@ pub async fn submit(question: &Question, code: &str) -> Result<SubmitResponse> {
             "typed_code": code,
         }))
         .unwrap()
-        .header("cookie", std::env::var("COOKIE").unwrap())
+        // .header("cookie", std::env::var("COOKIE").unwrap())
+        .header("cookie", cookie)
         .header(
             "Referer",
             format!("https://leetcode.cn/problems/{title_slug}/"),
@@ -84,17 +85,27 @@ pub enum CheckSubmissionsResponse {
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct QuestionRecord {
-    date: String,
-    question: Option<QuestionRecordQuestion>,
-    userStatus: QuestionRecordStatus,
+    pub date: String,
+    pub question: Option<QuestionRecordQuestion2>,
+    pub userStatus: Option<QuestionRecordStatus>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct QuestionRecordQuestion {
-    questionFrontendId: String,
-    title: String,
-    titleSlug: String,
-    translatedTitle: String,
-    lastSubmission: Option<String>,
+    pub questionFrontendId: String,
+    pub title: String,
+    pub titleSlug: String,
+    pub translatedTitle: String,
+    pub lastSubmission: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct QuestionRecordQuestion2 {
+    pub questionId: String,
+    pub frontendQuestionId: String,
+    pub title: String,
+    pub titleCn: String,
+    pub titleSlug: String,
+    pub lastSubmission: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum QuestionRecordStatus {
@@ -138,6 +149,7 @@ pub async fn daily_question_records(month: usize, year: usize) -> Result<Vec<Que
 
 pub async fn question_of_today() -> Result<Vec<QuestionRecord>> {
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[allow(non_snake_case)]
     struct ResponseWrapper {
         todayRecord: Vec<QuestionRecord>,
     }
@@ -148,7 +160,11 @@ pub async fn question_of_today() -> Result<Vec<QuestionRecord>> {
         operation_name: None,
     }).await?;
 
-    let data: Response<ResponseWrapper> = resp.body_json().await.unwrap();
+    let res = resp.body_string().await.unwrap();
+
+    log::trace!("res {res}");
+
+    let data: Response<ResponseWrapper> = serde_json::from_str(&res).unwrap();
 
     Ok(data.data.todayRecord)
 }
@@ -170,5 +186,17 @@ mod tests {
         let ss: CheckSubmissionsResponse = serde_json::from_str(s).unwrap();
 
         println!("{:?}", ss);
+    }
+    
+    #[test]
+    fn test_today() {
+        pretty_env_logger::formatted_builder()
+            .filter_level(log::LevelFilter::Trace)
+            .try_init()
+            .unwrap();
+        async_std::task::block_on(async {
+            let c = question_of_today().await.unwrap();
+            println!("{:?}", c);
+        })
     }
 }

@@ -26,8 +26,11 @@ pub fn guest_output(s: &str) -> impl Iterator<Item = Cow<'_, str>> {
     (0..).map_while(move |_| loop {
         match iter.next() {
             Some(line) if capture_next => {
-                capture_next = false;
-                return Some(Cow::Borrowed(line.trim()));
+                let line = line.trim();
+                if !line.is_empty() {
+                    capture_next = false;
+                    return Some(Cow::Borrowed(line));
+                }
             }
             Some(line) if line.contains("输出") => match read_output(&pure_output(line)) {
                 Some(r) => return Some(r.to_owned().into()),

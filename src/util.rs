@@ -17,7 +17,7 @@ pub fn parse_struct_name(s: &str) -> Option<&str> {
 
 pub fn get_title_slug(s: &str) -> Cow<'_, str> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r"leetcode-cn.com/problems/([\d\w\-]+)").unwrap();
+        static ref RE: Regex = Regex::new(r"/problems/([\d\w\-]+)").unwrap();
     }
     let mut iter = RE.captures_iter(s);
     if let Some(caps) = iter.next() {
@@ -47,5 +47,11 @@ mod tests {
     fn test_get_title_slug2() {
         let name = get_title_slug("abc-def");
         assert_eq!(name, "abc-def");
+    }
+    #[test]
+    fn test_get_title_slug3() {
+        let name =
+            get_title_slug(" https://leetcode.cn/problems/minimum-number-of-refueling-stops/");
+        assert_eq!(name, "minimum-number-of-refueling-stops");
     }
 }

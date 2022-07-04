@@ -20,14 +20,10 @@ leetcode-tool fetch random-pick-with-blacklist
 
 will generate file `src/random_pick_with_blacklist.rs` and add mod in `src/lib.rs`
 
-### Login
-```bash
-leetcode-tool login --cookie=xxxxx
-```
-
 ### Submit
 
 ```bash
+export COOKIE=<leetcode cookie>
 leetcode-tool submit random-pick-with-blacklist
 ```
 
