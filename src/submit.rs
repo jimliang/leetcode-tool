@@ -93,7 +93,7 @@ async fn read_content<P: AsRef<Path>>(file: P) -> Result<(String, String)> {
             start = false;
         } else if start {
             rust_code.push_str(&buf);
-            rust_code.push('\n');
+            // rust_code.push('\n');
         }
 
         buf.clear();
