@@ -21,7 +21,7 @@ struct WriteTemplate<'a> {
     question: &'a Question,
     snippet: &'a CodeSnippet,
     test_code: Option<String>,
-    import_code: Vec<String>,
+    // import_code: Vec<String>,
     title: String,
 }
 
@@ -37,7 +37,7 @@ impl<'a> WriteTemplate<'a> {
             question,
             snippet,
             test_code: None,
-            import_code: vec![],
+            // import_code: vec![],
             title,
         })
     }
@@ -51,24 +51,23 @@ impl<'a> WriteTemplate<'a> {
                 params,
                 r#return,
             } => {
-                let mut type_iter = params
-                    .iter()
-                    .map(|p| &p.r#type)
-                    .chain(std::iter::once(&r#return.r#type));
+                // let mut type_iter = params
+                //     .iter()
+                //     .map(|p| &p.r#type)
+                //     .chain(std::iter::once(&r#return.r#type));
 
-                if type_iter.clone().any(|ty| match ty {
-                    MetaDataType::TreeNode => true,
-                    _ => false,
-                }) {
-                    self.import_code
-                        .push("use crate::util::tree::TreeNode;".into());
-                }
-                if type_iter.any(|ty| match ty {
-                    MetaDataType::ListNode => true,
-                    _ => false,
-                }) {
-                    self.import_code.push("use crate::util::ListNode;".into());
-                }
+                // if type_iter.clone().any(|ty| match ty {
+                //     MetaDataType::TreeNode => true,
+                //     _ => false,
+                // }) {
+                //     self.import_code.push("use leetcode_tool::TreeNode;".into());
+                // }
+                // if type_iter.any(|ty| match ty {
+                //     MetaDataType::ListNode => true,
+                //     _ => false,
+                // }) {
+                //     self.import_code.push("use leetcode_tool::ListNode;".into());
+                // }
                 let test_cases = {
                     let test_cases_str = if let Some(s) = self.question.example_testcases.as_ref() {
                         s
@@ -131,9 +130,9 @@ impl<'a> WriteTemplate<'a> {
             } => {
                 // let struct_name = parse_struct_name(&self.snippet.code).unwrap_or("UnknowStruct");
 
-                self.import_code
-                    .push("use crate::util::fs::{TestObject, assert_object};".into());
-                self.import_code.push("use serde_json::Value;".into());
+                // self.import_code
+                //     .push("use leetcode_tool::{TestObject, assert_object};".into());
+                // self.import_code.push("use serde_json::Value;".into());
 
                 let method_code = methods.iter().map(
                     |MetaDataMethod {
@@ -191,7 +190,7 @@ impl<'a> WriteTemplate<'a> {
                 let test_code = format!(
                     r#"
             impl TestObject for {classname} {{
-                fn call(&mut self, method: &str, params: &Vec<Value>) -> Option<Value> {{
+                fn call(&mut self, method: &str, params: &[<Value>]) -> Option<Value> {{
                     match method {{
                         {method_code}
                         _ => {{}},
@@ -229,7 +228,7 @@ impl<'a> WriteTemplate<'a> {
         } = self.question;
 
         let md_lines = html2md::parse_html(translated_content)
-            .split("\n")
+            .split('\n')
             .map(|line| format!("/// {line}"))
             .collect::<Vec<String>>()
             .join("\n");
@@ -252,7 +251,7 @@ impl<'a> WriteTemplate<'a> {
         let file = File::create(&file_path).await?;
         let mut buf_writer = BufWriter::new(file);
 
-        let import_code = self.import_code.join("\n");
+        let import_code = "use leetcode_tool::prelude::*;";
         let doc_code = self.get_doc_code();
         let struct_code = if is_class { "" } else { "pub struct Solution;" };
         let test_code = self.test_code.take().unwrap_or_default();
@@ -315,8 +314,8 @@ fn format_val(val: &serde_json::Value, meta_type: &MetaDataType) -> Result<Strin
             format!(
                 "vec![{}]",
                 array
-                    .into_iter()
-                    .filter_map(|v| match format_val(v, &sub_meta_type) {
+                    .iter()
+                    .filter_map(|v| match format_val(v, sub_meta_type) {
                         Ok(o) => Some(o),
                         Err(err) => {
                             log::warn!("format_val: {:?}", err);
@@ -357,7 +356,7 @@ fn into_test_cases_iter<'a>(
     })
 }
 
-fn get_class_output<'a>(question: &'a Question) -> Result<(&'a str, &'a str), anyhow::Error> {
+fn get_class_output(question: &Question) -> Result<(&str, &str), anyhow::Error> {
     let (method_str, params_str) = {
         let test_cases_str = if let Some(s) = question.example_testcases.as_ref() {
             s
@@ -371,7 +370,7 @@ fn get_class_output<'a>(question: &'a Question) -> Result<(&'a str, &'a str), an
 }
 
 fn get_first_value(json: &str) -> Option<serde_json::Value> {
-    let params: serde_json::Value = serde_json::from_str(&json).ok()?;
+    let params: serde_json::Value = serde_json::from_str(json).ok()?;
     match params {
         serde_json::Value::Array(a) => a.into_iter().next(),
         _ => None,
