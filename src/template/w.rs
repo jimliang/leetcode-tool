@@ -190,7 +190,7 @@ impl<'a> WriteTemplate<'a> {
                 let test_code = format!(
                     r#"
             impl TestObject for {classname} {{
-                fn call(&mut self, method: &str, params: &[<Value>]) -> Option<Value> {{
+                fn call(&mut self, method: &str, params: &[Value]) -> Option<Value> {{
                     match method {{
                         {method_code}
                         _ => {{}},

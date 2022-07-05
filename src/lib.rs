@@ -17,4 +17,5 @@ pub mod prelude {
     pub use super::libs::tree::TreeNode;
     pub use serde_json;
     pub use serde_json::Value;
+    pub use rand;
 }
