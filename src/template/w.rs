@@ -1,10 +1,11 @@
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use async_std::{
     fs::{File, OpenOptions},
     io::BufWriter,
     io::WriteExt,
+    process::Command,
 };
 
 use crate::{
@@ -240,7 +241,7 @@ impl<'a> WriteTemplate<'a> {
         ///
         /// src: https://leetcode-cn.com/problems/{title_slug}/
         ///
-        /// difficulty: \`{difficulty}\`
+        /// difficulty: `{difficulty}`
     "
         )
     }
@@ -276,7 +277,9 @@ impl<'a> WriteTemplate<'a> {
             .await?;
         lib_file.flush().await?;
 
-        cargo_fmt(project_dir).await?;
+        if let Err(err) = cargo_fmt(project_dir).await {
+            log::warn!("`cargo fmt` process failed to execute: {:?}", err);
+        };
         Ok(file_path)
     }
 }
@@ -284,22 +287,19 @@ impl<'a> WriteTemplate<'a> {
 pub async fn write_template(
     question: &Question,
     project_dir: PathBuf,
-) -> crate::errors::Result<PathBuf> {
+) -> Result<PathBuf> {
     let mut wt = WriteTemplate::new(question)?;
     let pb = wt.write_to(project_dir).await?;
     Ok(pb)
 }
 
-async fn cargo_fmt(project_dir: PathBuf) -> crate::errors::Result<()> {
-    async_std::task::spawn_blocking(move || {
-        Command::new("cargo")
-            .arg("fmt")
-            .current_dir(project_dir)
-            .status()
-            .expect("cargo fmt process failed to execute");
-    })
-    .await;
-    Ok(())
+async fn cargo_fmt(project_dir: PathBuf) -> Result<std::process::ExitStatus> {
+    let res = Command::new("cargo")
+        .arg("fmt")
+        .current_dir(project_dir)
+        .status()
+        .await?;
+    Ok(res)
 }
 
 fn format_val(val: &serde_json::Value, meta_type: &MetaDataType) -> Result<String> {
@@ -356,7 +356,7 @@ fn into_test_cases_iter<'a>(
     })
 }
 
-fn get_class_output(question: &Question) -> Result<(&str, &str), anyhow::Error> {
+fn get_class_output(question: &Question) -> Result<(&str, &str)> {
     let (method_str, params_str) = {
         let test_cases_str = if let Some(s) = question.example_testcases.as_ref() {
             s
