@@ -15,7 +15,7 @@ pub mod prelude {
     pub use super::libs::list::ListNode;
     pub use super::libs::test::{assert_object, TestObject};
     pub use super::libs::tree::TreeNode;
+    pub use rand;
     pub use serde_json;
     pub use serde_json::Value;
-    pub use rand;
 }

@@ -1,0 +1,9 @@
+query problemsetRandomFilteredQuestion(
+  $categorySlug: String!
+  $filters: QuestionListFilterInput
+) {
+  problemsetRandomFilteredQuestion(
+    categorySlug: $categorySlug
+    filters: $filters
+  )
+}

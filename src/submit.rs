@@ -36,8 +36,16 @@ pub async fn submit_code(title_slug: &str, cookie: &str) -> Result<()> {
                 status_runtime,
                 status_memory,
                 full_compile_error,
+                last_testcase,
+                expected_output,
+                code_output,
                 ..
             } => {
+                if let (Some(a), Some(b), Some(c)) = (last_testcase, expected_output, code_output) {
+                    eprintln!("last_testcase >> {}", a);
+                    eprintln!("expected_output >> {}", b);
+                    eprintln!("code_output >> {}", c);
+                }
                 if let Some(compile_error) = full_compile_error {
                     eprintln!(">> {}", compile_error);
                     bail!("{:?}", status_msg);
@@ -66,7 +74,7 @@ pub async fn submit_code(title_slug: &str, cookie: &str) -> Result<()> {
 
 async fn read_content<P: AsRef<Path>>(file: P) -> Result<(String, String)> {
     lazy_static::lazy_static! {
-        static ref RE: Regex = Regex::new(r"leetcode-cn.com/problems/(\S+)/").unwrap();
+        static ref RE: Regex = Regex::new(r"/problems/(\S+)/").unwrap();
     }
     let f = File::open(file).await?;
     let mut buffer_reader = BufReader::new(f);
@@ -84,7 +92,7 @@ async fn read_content<P: AsRef<Path>>(file: P) -> Result<(String, String)> {
             break;
         }
 
-        if buf.starts_with("/// src: https://leetcode-cn.com/") {
+        if buf.starts_with("/// src:") {
             let mut iter = RE.captures_iter(&buf);
             title_slug = iter.next().unwrap().get(1).unwrap().as_str().to_owned();
         } else if buf.starts_with(START_LINE) {

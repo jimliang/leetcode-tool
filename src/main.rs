@@ -2,12 +2,23 @@ use std::env;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use leetcode_tool::{fetch, leetcode::question_of_today, submit, template, util::get_title_slug};
+use leetcode_tool::{
+    fetch,
+    leetcode::{question_of_today, random_question},
+    submit, template,
+    util::get_title_slug,
+};
 
 #[derive(Debug, clap::Subcommand)]
 enum Action {
-    Fetch { title: Option<String> },
-    Submit { title: String },
+    Fetch {
+        title: Option<String>,
+        #[clap(short, long, action)]
+        random: bool,
+    },
+    Submit {
+        title: String,
+    },
     // Login,
 }
 
@@ -22,17 +33,21 @@ async fn main_inner() -> Result<()> {
     let args = Args::parse();
 
     match args.action {
-        Action::Fetch { title } => {
+        Action::Fetch { title, random } => {
             let title = match title {
                 Some(t) => get_title_slug(&t).into_owned(),
                 None => {
-                    let question = question_of_today().await?;
-                    let title_slug = question
-                        .get(0)
-                        .and_then(|q| q.question.as_ref())
-                        .map(|q| &q.titleSlug)
-                        .expect("can not find today's question");
-                    title_slug.to_owned()
+                    if random {
+                        random_question().await?
+                    } else {
+                        let question = question_of_today().await?;
+                        let title_slug = question
+                            .get(0)
+                            .and_then(|q| q.question.as_ref())
+                            .map(|q| &q.titleSlug)
+                            .expect("can not find today's question");
+                        title_slug.to_owned()
+                    }
                 }
             };
             let title = get_title_slug(&title);

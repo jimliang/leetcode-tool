@@ -77,10 +77,14 @@ pub enum CheckSubmissionsResponse {
         status_memory: String,
         memory_percentile: Option<f32>,
         runtime_percentile: Option<f32>,
-        total_testcases: Option<usize>,
-        task_name: String,
+        // total_correct: Option<usize>,
+        // total_testcases: Option<usize>,
+        // task_name: String,
         compile_error: Option<String>,
         full_compile_error: Option<String>,
+        last_testcase: Option<String>,
+        expected_output: Option<String>,
+        code_output: Option<String>,
     },
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -168,6 +172,32 @@ pub async fn question_of_today() -> Result<Vec<QuestionRecord>> {
 
     Ok(data.data.todayRecord)
 }
+
+pub async fn random_question() -> Result<String> {
+    let mut res = graphql(&GraphqlBody {
+        operation_name: None,
+        variables: serde_json::json!({
+            "categorySlug": "",
+            "filters": {},
+        }),
+        query: include_str!("gql/random.gql"),
+    })
+    .await?;
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[allow(non_snake_case)]
+    struct ResponseWrapper {
+        problemsetRandomFilteredQuestion: String,
+    }
+
+    let res = res.body_string().await.unwrap();
+
+    // println!("{:?}", res_string);
+
+    let data: Response<ResponseWrapper> = serde_json::from_str(&res).unwrap();
+
+    Ok(data.data.problemsetRandomFilteredQuestion)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,7 +217,7 @@ mod tests {
 
         println!("{:?}", ss);
     }
-    
+
     #[test]
     fn test_today() {
         pretty_env_logger::formatted_builder()
@@ -197,6 +227,17 @@ mod tests {
         async_std::task::block_on(async {
             let c = question_of_today().await.unwrap();
             println!("{:?}", c);
+        })
+    }
+    #[test]
+    fn test_random() {
+        pretty_env_logger::formatted_builder()
+            .filter_level(log::LevelFilter::Trace)
+            .try_init()
+            .unwrap();
+        async_std::task::block_on(async {
+            let c = random_question().await.unwrap();
+            println!("{}", c);
         })
     }
 }

@@ -239,7 +239,7 @@ impl<'a> WriteTemplate<'a> {
         ///
         {md_lines}
         ///
-        /// src: https://leetcode-cn.com/problems/{title_slug}/
+        /// src: https://leetcode.cn/problems/{title_slug}/
         ///
         /// difficulty: `{difficulty}`
     "
@@ -284,10 +284,7 @@ impl<'a> WriteTemplate<'a> {
     }
 }
 
-pub async fn write_template(
-    question: &Question,
-    project_dir: PathBuf,
-) -> Result<PathBuf> {
+pub async fn write_template(question: &Question, project_dir: PathBuf) -> Result<PathBuf> {
     let mut wt = WriteTemplate::new(question)?;
     let pb = wt.write_to(project_dir).await?;
     Ok(pb)
