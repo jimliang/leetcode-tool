@@ -143,10 +143,7 @@ impl<'a> WriteTemplate<'a> {
                      }| {
 
                         let param_lines = params.iter().enumerate().map(|(i, param)| {
-                            let s = match param.r#type {
-                                MetaDataType::Integer => format!("params[{i}].as_i64().unwrap() as i32"),
-                                _ => "".into(),
-                            };
+                            let s = json_to_rust(&format!("params[{i}]"), &param.r#type);
 
                             format!("let p{i} = {s};")
                         }).collect::<Vec<String>>();
@@ -159,10 +156,11 @@ impl<'a> WriteTemplate<'a> {
                         let ps_code = param_lines.join("\n");
                         let ps_code2 = param_lines.iter().enumerate().map(|(i, _)| format!("p{i}")).collect::<Vec<String>>().join(",");
 
+                        let method_name = name.to_snake_case();
                         let body = if let Some(res) = res {
-                            format!("{ps_code}\nlet res = self.{name}({ps_code2});\nreturn Some({res})")
+                            format!("{ps_code}\nlet res = self.{method_name}({ps_code2});\nreturn Some({res})")
                         } else {
-                            format!("{ps_code}\nlet _ = self.{name}({ps_code2});")
+                            format!("{ps_code}\nself.{method_name}({ps_code2});")
                         };
 
                         format!("\"{name}\" => {{ {body} }}")
@@ -188,6 +186,7 @@ impl<'a> WriteTemplate<'a> {
                     None => "".to_owned(),
                 };
 
+                let classname2 = classname.to_snake_case();
                 let test_code = format!(
                     r#"
             impl TestObject for {classname} {{
@@ -201,7 +200,7 @@ impl<'a> WriteTemplate<'a> {
             }}
 
             #[test]
-            pub fn test_{classname}() {{
+            pub fn test_{classname2}() {{
                 let methods = {methods_json};
                 let params = {params_json};
                 let excepts = {excepts_json};
@@ -388,4 +387,25 @@ fn format_params<'a, 'b>(
         })
         .collect::<Vec<String>>()
         .join(",")
+}
+
+fn json_to_rust(prefix: &str, param_type: &MetaDataType) -> String {
+    let s = match param_type {
+        MetaDataType::Integer => format!("{prefix}.as_i64().unwrap() as i32"),
+        MetaDataType::String => format!("{prefix}.as_str().unwrap().to_owned()"),
+        MetaDataType::Character => format!("{prefix}.as_str().unwrap().chars().next().unwrap()"),
+        MetaDataType::ListNode => {
+            format!("ListNode::from_jsonstr(\"{prefix}.as_str().unwrap()\")")
+        }
+        MetaDataType::TreeNode => {
+            format!("TreeNode::from_jsonstr(\"{prefix}.as_str().unwrap()\")")
+        }
+        MetaDataType::List(ref sub_meta_type) => {
+            let sub_type = json_to_rust("pp", sub_meta_type);
+            format!("{prefix}.as_array().unwrap().iter().map(|pp| {sub_type}).collect()")
+        }
+        _ => prefix.into(),
+    };
+
+    s
 }
