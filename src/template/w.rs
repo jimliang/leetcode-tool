@@ -52,23 +52,6 @@ impl<'a> WriteTemplate<'a> {
                 params,
                 r#return,
             } => {
-                // let mut type_iter = params
-                //     .iter()
-                //     .map(|p| &p.r#type)
-                //     .chain(std::iter::once(&r#return.r#type));
-
-                // if type_iter.clone().any(|ty| match ty {
-                //     MetaDataType::TreeNode => true,
-                //     _ => false,
-                // }) {
-                //     self.import_code.push("use leetcode_tool::TreeNode;".into());
-                // }
-                // if type_iter.any(|ty| match ty {
-                //     MetaDataType::ListNode => true,
-                //     _ => false,
-                // }) {
-                //     self.import_code.push("use leetcode_tool::ListNode;".into());
-                // }
                 let test_cases = {
                     let test_cases_str = if let Some(s) = self.question.example_testcases.as_ref() {
                         s
@@ -88,7 +71,7 @@ impl<'a> WriteTemplate<'a> {
 
                             _ => serde_json::from_str(&output).ok()?,
                         };
-                        format_val(&o, &r#return.r#type).ok()
+                        json_value_to_rust(&o, &r#return.r#type).ok()
                     });
                 let method_name = name.to_snake_case();
 
@@ -147,11 +130,7 @@ impl<'a> WriteTemplate<'a> {
 
                             format!("let p{i} = {s};")
                         }).collect::<Vec<String>>();
-                        let res = match r#return.r#type {
-                            MetaDataType::Bool => Some("Value::Bool(res)".to_owned()),
-                            MetaDataType::Integer => Some("Value::Number(res.into())".to_owned()),
-                            _ => None,
-                        };
+                        let res = rust_to_json_value("res", &r#return.r#type);
 
                         let ps_code = param_lines.join("\n");
                         let ps_code2 = param_lines.iter().enumerate().map(|(i, _)| format!("p{i}")).collect::<Vec<String>>().join(",");
@@ -298,23 +277,23 @@ async fn cargo_fmt(project_dir: PathBuf) -> Result<std::process::ExitStatus> {
     Ok(res)
 }
 
-fn format_val(val: &serde_json::Value, meta_type: &MetaDataType) -> Result<String> {
+fn json_value_to_rust(val: &serde_json::Value, meta_type: &MetaDataType) -> Result<String> {
     let v = match meta_type {
         MetaDataType::List(sub_meta_type) => {
             let array = match val {
                 serde_json::Value::Array(a) => a,
                 _ => {
-                    bail!("format_val parse error: {} {:?}", val, meta_type);
+                    bail!("json_value_to_rust parse error: {} {:?}", val, meta_type);
                 }
             };
             format!(
                 "vec![{}]",
                 array
                     .iter()
-                    .filter_map(|v| match format_val(v, sub_meta_type) {
+                    .filter_map(|v| match json_value_to_rust(v, sub_meta_type) {
                         Ok(o) => Some(o),
                         Err(err) => {
-                            log::warn!("format_val: {:?}", err);
+                            log::warn!("json_value_to_rust: {:?}", err);
                             None
                         }
                     })
@@ -378,34 +357,43 @@ fn format_params<'a, 'b>(
     param_types: impl Iterator<Item = &'b MetaDataType>,
 ) -> String {
     vals.zip(param_types)
-        .filter_map(|(val, param_type)| match format_val(val, param_type) {
-            Ok(o) => Some(o),
-            Err(err) => {
-                log::warn!("format_params: {:?}", err);
-                None
-            }
-        })
+        .filter_map(
+            |(val, param_type)| match json_value_to_rust(val, param_type) {
+                Ok(o) => Some(o),
+                Err(err) => {
+                    log::warn!("format_params: {:?}", err);
+                    None
+                }
+            },
+        )
         .collect::<Vec<String>>()
         .join(",")
 }
 
 fn json_to_rust(prefix: &str, param_type: &MetaDataType) -> String {
-    let s = match param_type {
+    match param_type {
         MetaDataType::Integer => format!("{prefix}.as_i64().unwrap() as i32"),
         MetaDataType::String => format!("{prefix}.as_str().unwrap().to_owned()"),
         MetaDataType::Character => format!("{prefix}.as_str().unwrap().chars().next().unwrap()"),
         MetaDataType::ListNode => {
-            format!("ListNode::from_jsonstr(\"{prefix}.as_str().unwrap()\")")
+            format!("ListNode::from_jsonstr({prefix}.as_str().unwrap())")
         }
         MetaDataType::TreeNode => {
-            format!("TreeNode::from_jsonstr(\"{prefix}.as_str().unwrap()\")")
+            format!("TreeNode::from_jsonstr({prefix}.as_str().unwrap())")
         }
         MetaDataType::List(ref sub_meta_type) => {
             let sub_type = json_to_rust("pp", sub_meta_type);
             format!("{prefix}.as_array().unwrap().iter().map(|pp| {sub_type}).collect()")
         }
-        _ => prefix.into(),
-    };
+        MetaDataType::Bool => format!("{prefix}.as_bool().unwrap()"),
+        MetaDataType::Void => prefix.into(),
+        MetaDataType::Unknow(_) => prefix.into(),
+    }
+}
 
-    s
+fn rust_to_json_value(res: &str, param_type: &MetaDataType) -> Option<String> {
+    match param_type {
+        MetaDataType::Void => None,
+        _ => Some(format!("json!({res})")),
+    }
 }
