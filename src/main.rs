@@ -56,6 +56,11 @@ async fn main_inner() -> Result<()> {
             let project_dir = env::current_dir()?;
             let file_path = template::w::write_template(&question, project_dir).await?;
             println!("> {}", file_path.display());
+            if !question.hints.is_empty() {
+                for hint in question.hints {
+                    println!("> {}", hint);
+                }
+            }
         }
         Action::Submit { title } => {
             let cookie = match std::env::var("COOKIE") {
