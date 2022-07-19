@@ -1,16 +1,33 @@
+use serde_json::Value;
+
 pub trait TestObject {
-    fn call(&mut self, method: &str, args: &[serde_json::Value]) -> Option<serde_json::Value>;
+    fn call(&mut self, method: &str, args: &[Value]) -> Option<Value>;
 }
 
-pub fn assert_object<O: TestObject>(mut obj: O, methods: &str, params: &str, excepts: &str) {
-    let methods = serde_json::from_str::<Vec<String>>(methods).unwrap();
-    let params = serde_json::from_str::<Vec<Vec<serde_json::Value>>>(params).unwrap();
-    let excepts = serde_json::from_str::<Vec<serde_json::Value>>(excepts).unwrap();
+fn into_array(value: Value) -> Vec<Value> {
+    match value {
+        Value::Array(a) => a,
+        _ => unreachable!(),
+    }
+}
 
-    for (i, bb) in methods.into_iter().zip(params).zip(excepts).enumerate() {
+pub fn assert_object<O: TestObject>(mut obj: O, methods: Value, params: Value, excepts: Value) {
+    let iter = into_array(methods)
+        .into_iter()
+        .map(|v| match v {
+            Value::String(s) => s,
+            _ => unreachable!(),
+        })
+        .zip(into_array(params).into_iter().map(into_array))
+        .zip(into_array(excepts).into_iter().map(|v| match v {
+            Value::String(s) => s,
+            _ => unreachable!(),
+        }));
+
+    for (i, bb) in iter.enumerate() {
         let ((m, p), e) = bb;
         let now = std::time::Instant::now();
-        let result = obj.call(m.as_str(), &p);
+        let result = obj.call(&m, &p);
         println!(
             "{}. call {} {:?} --> {:?}, used {:?}",
             i,

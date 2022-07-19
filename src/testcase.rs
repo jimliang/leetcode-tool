@@ -53,10 +53,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse() {
-        let a = parse_class_test_cases("[\"AllOne\",\"inc\",\"inc\",\"getMaxKey\",\"getMinKey\",\"inc\",\"getMaxKey\",\"getMinKey\"]\n[[],[\"hello\"],[\"hello\"],[],[],[\"leet\"],[],[]]").unwrap();
-        println!("--> testcases: {:?}", a.collect::<Vec<_>>())
-    }
+    // fn test_parse() {
+    //     let a = parse_class_test_cases("[\"AllOne\",\"inc\",\"inc\",\"getMaxKey\",\"getMinKey\",\"inc\",\"getMaxKey\",\"getMinKey\"]\n[[],[\"hello\"],[\"hello\"],[],[],[\"leet\"],[],[]]").unwrap();
+    //     println!("--> testcases: {:?}", a.collect::<Vec<_>>())
+    // }
     #[test]
     fn test_parse2() {
         let a = parse_test_cases("\"ab\"\n\"ba\"\n\"ab\"\n\"ab\"\n\"aa\"\n\"aa\"").unwrap();

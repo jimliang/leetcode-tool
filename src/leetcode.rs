@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use anyhow::{Ok, Result};
 
 use crate::domain::Question;
@@ -153,7 +154,6 @@ pub async fn daily_question_records(month: usize, year: usize) -> Result<Vec<Que
 
 pub async fn question_of_today() -> Result<Vec<QuestionRecord>> {
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-    #[allow(non_snake_case)]
     struct ResponseWrapper {
         todayRecord: Vec<QuestionRecord>,
     }
@@ -185,7 +185,6 @@ pub async fn random_question() -> Result<String> {
     .await?;
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-    #[allow(non_snake_case)]
     struct ResponseWrapper {
         problemsetRandomFilteredQuestion: String,
     }

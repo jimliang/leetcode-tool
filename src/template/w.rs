@@ -150,19 +150,20 @@ impl<'a> WriteTemplate<'a> {
 
                 let (methods_json, params_json) = get_class_output(self.question)?;
 
+                let param_value = into_array(params_json).unwrap();
                 let constructor_param = {
-                    let params = get_first_value(params_json).unwrap();
                     format_params(
-                        params.as_array().unwrap().iter(),
+                        param_value[0].as_array().unwrap().iter(),
                         constructor.params.iter().map(|p| &p.r#type),
                     )
                 };
 
-                let methods_json = format!("r#\"{}\"#", methods_json);
-                let params_json = format!("r#\"{}\"#", params_json);
                 let excepts_json = match output_iter.next() {
-                    Some(output) => format!("r#\"{}\"#", output),
-                    None => "".to_owned(),
+                    Some(output) => output.to_string(),
+                    None => {
+                        let params_len = param_value.len();
+                        format!("[{}]", vec!["null"; params_len].join(","))
+                    }
                 };
 
                 let classname2 = classname.to_snake_case();
@@ -180,11 +181,7 @@ impl<'a> WriteTemplate<'a> {
 
             #[test]
             pub fn test_{classname2}() {{
-                let methods = {methods_json};
-                let params = {params_json};
-                let excepts = {excepts_json};
-                let obj = {classname}::new({constructor_param});
-                assert_object(obj, methods, params, excepts);
+                assert_object({classname}::new({constructor_param}), json!({methods_json}), json!({params_json}), json!({excepts_json}));
             }}
             "#,
                 );
@@ -344,10 +341,10 @@ fn get_class_output(question: &Question) -> Result<(&str, &str)> {
     Ok((method_str, params_str))
 }
 
-fn get_first_value(json: &str) -> Option<serde_json::Value> {
+fn into_array(json: &str) -> Option<Vec<serde_json::Value>> {
     let params: serde_json::Value = serde_json::from_str(json).ok()?;
     match params {
-        serde_json::Value::Array(a) => a.into_iter().next(),
+        serde_json::Value::Array(a) => Some(a),
         _ => None,
     }
 }
